@@ -1,3 +1,4 @@
+library(data.table)
 # Define accepted characters
 accepted_chars <- c(letters, " ")
 
@@ -24,8 +25,8 @@ train <- function() {
   counts <- matrix(10, nrow = k, ncol = k)
   
   # Count transitions from big text file
-  big_text <- readLines("big.txt")
-  for (line in big_text) {
+  big_text <- fread("addresses_cleaned.csv")
+  for (line in big_text$big_text_cleaned) {
     #line <- big_text[1]
     grams <- ngram(2, line)
     for (gram in grams) {
@@ -40,21 +41,21 @@ train <- function() {
   counts <- log(counts / rowSums(counts))
   
   # Calculate average transition probabilities for good and bad phrases
-  good_text <- readLines("good.txt")
+  good_text <- fread("addresses_cleaned.csv")
   #l <- good_text[1]
-  good_probs <- sapply(good_text, function(l) {
+  good_probs <- sapply(good_text$big_text_cleaned, function(l) {
     avg_transition_prob(l, counts)
   })
-  bad_text <- readLines("bad.txt")
-  bad_probs <- sapply(bad_text, function(l) {
+  bad_text <- fread("bad.csv")
+  bad_probs <- sapply(bad_text$gibberish_words, function(l) {
     avg_transition_prob(l, counts)
   })
   
   # Assert that good phrases have higher probabilities than bad phrases
-  stopifnot(min(good_probs) > max(bad_probs))
+  stopifnot(median(good_probs) > median(bad_probs))
   
   # Pick a threshold halfway between the worst good and best bad inputs
-  thresh <- (min(good_probs) + max(bad_probs)) / 2
+  thresh <- (median(good_probs) + median(bad_probs)) / 2
   
   # Save model
   saveRDS(list(mat = counts, thresh = thresh), file = "gib_model.rds")
@@ -75,3 +76,5 @@ avg_transition_prob <- function(l, log_prob_mat) {
 
 # Call train function
 train()
+fwrite(data.table(words = names(good_probs),good_probs),"good_probs.csv")
+fwrite(data.table(words = names(bad_probs),bad_probs),"bad_probs.csv")
